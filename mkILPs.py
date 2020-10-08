@@ -36,12 +36,13 @@ def process(opts, fname):
 
     id = 1
     for _jobs, releaseTimes, deadlines, executionTimes, _procs, M in parser.main(ncores, fname):
-        print('Preparing model #%d...' % id)
-        milp = milpForm.makeModel(releaseTimes, deadlines, executionTimes, ncores, M)
-        model_fname = os.path.join(odir, bname.replace('.csv', '') + ('-ID%03d.%s' % (id, opts.format)))
+        name = bname.replace('.csv', '') + ('-ID%03d' % id)
+        id += 1
+        print('Preparing model %s  (%d jobs)...' % (name, len(releaseTimes)))
+        milp = milpForm.makeModel(releaseTimes, deadlines, executionTimes, ncores, M, name)
+        model_fname = os.path.join(odir, '%s.%s' % (name, opts.format))
         print('Writing %s...' % model_fname)
         milp.write(model_fname)
-        id += 1
 
 def parse_args():
     parser = argparse.ArgumentParser(
