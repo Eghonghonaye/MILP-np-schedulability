@@ -21,4 +21,4 @@ mkdir -p $RESULTS_DIR/logs
 
 echo "$MODEL -> $OUTPUT"
 
-exec $SOLVER LogToConsole=0 LogFile=$OUTPUT ResultFile=$SOLUTION  TimeLimit=$LIMIT $MODEL
+exec $SOLVER LogToConsole=0 LogFile=$OUTPUT ResultFile=$SOLUTION  TimeLimit=$LIMIT Threads=1 $MODEL
