@@ -43,6 +43,9 @@ def process(opts, fname):
         model_fname = os.path.join(odir, '%s.%s' % (name, opts.format))
         print('Writing %s...' % model_fname)
         milp.write(model_fname)
+        if opts.limit_job_sets and id > opts.limit_job_sets:
+            print('Reached job set limit (%d), stopping.' % opts.limit_job_sets)
+            break
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -51,6 +54,10 @@ def parse_args():
     parser.add_argument('input_files', nargs='*',
         metavar='INPUT',
         help='input files (*.csv)')
+
+    parser.add_argument('-l', '--limit-job-sets', default=None,
+                        action='store', type=int,
+                        help='maximum number of models to generate per configuration')
 
     parser.add_argument('-m', '--number-of-cores', default=None,
                         action='store', type=int,
