@@ -4,19 +4,8 @@ import argparse
 import re
 import os
 
-import milpForm
-import parser
-
-def main():
-	number_of_cores = int(sys.argv[1])
-	number_of_tasks = int(sys.argv[2])
-	for utilisation in [90,80,70,60,50,40,30,20,10]:
-		path = "TaskSets/" + str(number_of_cores) + "Cores" + str(number_of_tasks) + "Tasks" + str(utilisation) + ".csv"
-		resultPath = "MILPresults" + str(number_of_cores) + "Cores" + str(number_of_tasks) + "Tasks"
-
-		for jobs, releaseTimes, deadlines, executionTimes, processors, M in parser.main(number_of_cores,path):
-			status = milpForm.runExperiment(jobs, releaseTimes, deadlines, executionTimes, processors, M)
-			lg.log_results(resultPath, [utilisation,status])
+import model
+import load
 
 def process(opts, fname):
     bname = os.path.basename(fname)
@@ -35,17 +24,28 @@ def process(opts, fname):
     os.makedirs(odir, exist_ok=True)
 
     id = 1
-    for _jobs, releaseTimes, deadlines, executionTimes, _procs, M in parser.main(ncores, fname):
-        name = bname.replace('.csv', '') + ('-ID%03d' % id)
-        id += 1
-        print('Preparing model %s  (%d jobs)...' % (name, len(releaseTimes)))
-        milp = milpForm.makeModel(releaseTimes, deadlines, executionTimes, ncores, M, name)
-        model_fname = os.path.join(odir, '%s.%s' % (name, opts.format))
-        print('Writing %s...' % model_fname)
-        milp.write(model_fname)
+    for jobset in load.jobsets(fname):
         if opts.limit_job_sets and id > opts.limit_job_sets:
             print('Reached job set limit (%d), stopping.' % opts.limit_job_sets)
             break
+
+        name = bname.replace('.csv', '') + ('-ID%03d' % id)
+        id += 1
+
+        if opts.skip_schedulable and jobset.taskset.schedulable:
+            print('Skipping %s: a heuristic already deemed it feasible.' % name)
+            continue
+
+        print('Preparing model %s  (%d jobs)...' % (name, len(jobset.jobs)))
+        releases  = [j.release for j in jobset.jobs]
+        job_costs = [j.task.wcet for j in jobset.jobs]
+        deadlines = [j.deadline for j in jobset.jobs]
+        M = jobset.taskset.hyperperiod * 10 # "big M" constant
+        milp = model.make_gurobi_milp(releases, deadlines, job_costs, ncores, M, name)
+
+        model_fname = os.path.join(odir, '%s.%s' % (name, opts.format))
+        print('Writing %s...' % model_fname)
+        milp.write(model_fname)
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -70,6 +70,10 @@ def parse_args():
     parser.add_argument('-f', '--format', default='lp',
                         choices=['lp', 'mps'],
                         help='what output format to generate')
+
+    parser.add_argument('-s', '--skip-schedulable', default=False,
+                        action='store_true',
+                        help="don't generate MILPs for workloads found schedulable by a heuristic")
 
     return parser.parse_args()
 
