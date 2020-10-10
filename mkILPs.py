@@ -32,6 +32,14 @@ def process(opts, fname):
         name = bname.replace('.csv', '') + ('-ID%03d' % id)
         id += 1
 
+        if opts.propagate_results:
+            if jobset.taskset.schedulable:
+                # fake a successful result file
+                flog = open(os.path.join(odir, '%s.%s' % (name, 'log')), 'w')
+                print('Optimal solution found by heuristic', file=flog, flush=True)
+                flog.close()
+            continue
+
         if opts.skip_schedulable and jobset.taskset.schedulable:
             print('Skipping %s: a heuristic already deemed it feasible.' % name)
             continue
@@ -74,6 +82,10 @@ def parse_args():
     parser.add_argument('-s', '--skip-schedulable', default=False,
                         action='store_true',
                         help="don't generate MILPs for workloads found schedulable by a heuristic")
+
+    parser.add_argument('-p', '--propagate-results', default=False,
+                        action='store_true',
+                        help="create dummy .log files for workloads found schedulable by a heuristic")
 
     return parser.parse_args()
 
