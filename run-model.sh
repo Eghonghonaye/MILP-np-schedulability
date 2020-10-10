@@ -2,8 +2,10 @@
 
 set -e
 
-# 1 hour timeout, in seconds
-LIMIT=$((1 * 60 * 60))
+# timeout
+LIMIT_HOURS=2
+# timeout, in seconds
+LIMIT=$((LIMIT_HOURS * 60 * 60))
 
 MODEL=$1
 SOLVER=gurobi_cl
