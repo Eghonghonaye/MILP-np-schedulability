@@ -11,6 +11,7 @@ class Outcome(IntEnum):
     TIMEOUT    = 0
     FEASIBLE   = 1
     INFEASIBLE = 2
+    INCOMPLETE = 3
 
 def parse_outcome(fname):
     with open(fname, 'r') as f:
@@ -22,7 +23,8 @@ def parse_outcome(fname):
         elif 'Optimal solution found' in log:
             return Outcome.FEASIBLE
         else:
-            assert False # could not figure out outcome
+            # could not figure out outcome
+            return Outcome.INCOMPLETE
 
 FNAME_PATTERN = re.compile(r'([0-9]+)Cores([0-9]+)Tasks([0-9]+)-ID([0-9]+).log')
 
@@ -36,7 +38,7 @@ def parse_config(fname):
     return (cores, tasks, util, id)
 
 def count_results(opts):
-    results = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: ([], [], []))))
+    results = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: ([], [], [], []))))
     for f in opts.input_files:
         outcome = parse_outcome(f)
         cores, tasks, util, id = parse_config(f)
@@ -44,13 +46,15 @@ def count_results(opts):
     return results
 
 def print_results(opts, results):
-    print("%6s,%6s,%5s,%9s,%11s,%10s,%18s" % (
+    print("%6s,%6s,%5s,%9s,%11s,%10s,%11s,%6s,%18s" % (
         'Cores',
         'Tasks',
         'Util',
         'Feasible',
         'Infeasible',
         'Timed-out',
+        'Incomplete',
+        'Total',
         'Feasibility Ratio',
     ))
     for cores in sorted(results.keys()):
@@ -59,14 +63,18 @@ def print_results(opts, results):
                 feas    = len(results[cores][tasks][util][Outcome.FEASIBLE])
                 infeas  = len(results[cores][tasks][util][Outcome.INFEASIBLE])
                 timeout = len(results[cores][tasks][util][Outcome.TIMEOUT])
-                print("%6d,%6d,%5d,%9d,%11d,%10d,%18.4f" % (
+                incomp  = len(results[cores][tasks][util][Outcome.INCOMPLETE])
+                total   = feas + infeas + timeout + incomp
+                print("%6d,%6d,%5d,%9d,%11d,%10d,%11d,%6d,%18.4f" % (
                     cores,
                     tasks,
                     util,
                     feas,
                     infeas,
                     timeout,
-                    feas / (feas + infeas + timeout)
+                    incomp,
+                    total,
+                    feas / total
                 ))
 
 def list(opts):
