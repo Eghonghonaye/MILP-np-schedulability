@@ -117,7 +117,8 @@ def process(opts, fname):
     else:
         ncores = int(m.group(1))
 
-    print('Processing %s...' % fname)
+    if not opts.compare:
+        print('Processing %s...' % fname)
 
     odir = opts.output_dir if opts.output_dir else os.path.dirname(fname)
     os.makedirs(odir, exist_ok=True)
@@ -133,16 +134,27 @@ def process(opts, fname):
         for i, j in enumerate(jobset.jobs):
             j.id = i
 
+        sched_name = os.path.join(odir, name + '-schedule.csv')
+
         allocations = None
         # first, try inferring a schedule from a MILP solution
         if opts.load_milp_sol:
             sol_fname = os.path.join(opts.solutions_dir, name + '.sol')
             if os.path.exists(sol_fname):
                 allocations = load_solution(sol_fname)
-                if not allocations:
+                if opts.compare:
+                    if allocations and not os.path.exists(sched_name):
+                        print(name, 'solved by MILP solver')
+                    continue
+                elif not allocations:
                     print('%s: infeasible.' % name)
                     continue
-        # if that didn't work, try a heuristic
+
+        if opts.compare:
+            if not os.path.exists(sched_name) and jobset.taskset.schedulable:
+                print(name, 'solved by prior heuristics')
+            continue
+
         if not allocations and opts.heuristic:
             print('Trying to schedule %s (%d jobs)...' % (name, len(jobset.jobs)))
             (unassigned, schedule, _) = paf_backfill(jobset.jobs, ncores)
@@ -157,7 +169,7 @@ def process(opts, fname):
                 task_counter[alloc.job.task.id] += 1
                 alloc.job.job_of_task = task_counter[alloc.job.task.id]
 
-            with open(os.path.join(odir, name + '-schedule.csv'), 'w') as f:
+            with open(sched_name, 'w') as f:
                 show(opts, allocations, file=f)
         else:
             print('%s: no solution found.' % name)
@@ -189,6 +201,10 @@ def parse_args():
     parser.add_argument('--heuristic', default=None,
                         action='store_true',
                         help='run a scheduling heuristic')
+
+    parser.add_argument('--compare', default=None,
+                        action='store_true',
+                        help='compare against schedulability flag')
 
     parser.add_argument('-l', '--load-milp-sol', default=None,
                         action='store_true',
