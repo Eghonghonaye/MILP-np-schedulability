@@ -46,7 +46,8 @@ def intervals_of_interest(releases, deadlines, costs):
                  for d in set(deadlines))
             if ratio > 1)
 
-def make_gurobi_milp(releaseTimes, deadlines, executionTimes, ncores, M, name='RAP'):
+def make_gurobi_milp(releaseTimes, deadlines, executionTimes, ncores, M, name='RAP',
+                     with_demand_constraints=False):
     # declare and init model
     m = Model(name)
 
@@ -101,9 +102,10 @@ def make_gurobi_milp(releaseTimes, deadlines, executionTimes, ncores, M, name='R
         vars   = [x[i,k] for i in range(njobs) if releaseTimes[i] < b and deadlines[i] > a]
         return LinExpr(coeffs, vars) <= (b - a)
 
-    for (a, b) in intervals_of_interest(releaseTimes, deadlines, executionTimes):
-        m.addConstrs((demand_constraint(a, b, k) for k in range(ncores)),
-                      'demand-%d-%d' % (a, b))
+    if with_demand_constraints:
+        for (a, b) in intervals_of_interest(releaseTimes, deadlines, executionTimes):
+            m.addConstrs((demand_constraint(a, b, k) for k in range(ncores)),
+                          'demand-%d-%d' % (a, b))
 
     # we just want a feasible solution
     m.setObjective(0)
