@@ -52,6 +52,7 @@ def jobs(task, horizon):
         yield as_object({
             'release' : rel,
             'deadline': rel + task.period,
+            'cost'    : task.wcet,
             'task'    : task,
         })
 
