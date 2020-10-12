@@ -26,7 +26,7 @@ def parse_outcome(fname):
             # could not figure out outcome
             return Outcome.INCOMPLETE
 
-FNAME_PATTERN = re.compile(r'([0-9]+)Cores([0-9]+)Tasks([0-9]+)-ID([0-9]+).*\.log')
+FNAME_PATTERN = re.compile(r'([0-9]+)Cores([0-9]+)Tasks([0-9]+)-ID([0-9]+).*(\.log|-schedule\.csv)')
 
 def parse_config(fname):
     m = FNAME_PATTERN.match(os.path.basename(fname))
@@ -35,13 +35,18 @@ def parse_config(fname):
     tasks = int(m.group(2))
     util  = int(m.group(3))
     id    = int(m.group(4))
-    return (cores, tasks, util, id)
+    kind  = 'log' if 'log' in m.group(5) else 'schedule'
+    return (cores, tasks, util, id, kind)
 
 def count_results(opts):
     results = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: ([], [], [], []))))
     for f in opts.input_files:
-        outcome = parse_outcome(f)
-        cores, tasks, util, id = parse_config(f)
+        cores, tasks, util, id, kind = parse_config(f)
+        if kind == 'log':
+            outcome = parse_outcome(f)
+        else:
+            # in case of a schedule, existence implies feasibility
+            outcome = Outcome.FEASIBLE
         results[cores][tasks][util][outcome].append(id)
     return results
 
@@ -55,7 +60,7 @@ def print_results(opts, results):
         'Timed-out',
         'Incomplete',
         'Total',
-        'Feasibility Ratio',
+        'Schedulability Ratio',
     ))
     for cores in sorted(results.keys()):
         for tasks in sorted(results[cores].keys()):
@@ -64,7 +69,7 @@ def print_results(opts, results):
                 infeas  = len(results[cores][tasks][util][Outcome.INFEASIBLE])
                 timeout = len(results[cores][tasks][util][Outcome.TIMEOUT])
                 incomp  = len(results[cores][tasks][util][Outcome.INCOMPLETE])
-                total   = feas + infeas + timeout + incomp
+                total = feas + infeas + timeout + incomp if not opts.total else opts.total
                 print("%6d,%6d,%5d,%9d,%11d,%10d,%11d,%6d,%18.4f" % (
                     cores,
                     tasks,
@@ -106,6 +111,10 @@ def parse_args():
     parser.add_argument('-t', '--list-timeouts', default=False,
                         action='store_true',
                         help='output list of models that timed out')
+
+    parser.add_argument('--total', default=None,
+                        action='store', type=int,
+                        help='total to assume for schedulability purposes')
 
     return parser.parse_args()
 
