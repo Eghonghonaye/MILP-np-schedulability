@@ -45,14 +45,14 @@ def load_solution(fname):
     start_times = {}
     for m in START_TIME.finditer(sol):
         job_id  = int(m.group(1))
-        stime = ast.literal_eval(m.group(2))
+        stime = round(ast.literal_eval(m.group(2)), 2)
         start_times[job_id] = stime
 
     # infer finish times
     finish_times = {}
     for m in FINISH_TIME.finditer(sol):
         job_id  = int(m.group(1))
-        ftime = ast.literal_eval(m.group(2))
+        ftime = round(ast.literal_eval(m.group(2)), 2)
         finish_times[job_id] = ftime
 
     return allocations(mapping, start_times, finish_times)
