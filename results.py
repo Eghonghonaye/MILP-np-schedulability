@@ -26,7 +26,7 @@ def parse_outcome(fname):
             # could not figure out outcome
             return Outcome.INCOMPLETE
 
-FNAME_PATTERN = re.compile(r'([0-9]+)Cores([0-9]+)Tasks([0-9]+)-ID([0-9]+).log')
+FNAME_PATTERN = re.compile(r'([0-9]+)Cores([0-9]+)Tasks([0-9]+)-ID([0-9]+).*\.log')
 
 def parse_config(fname):
     m = FNAME_PATTERN.match(os.path.basename(fname))

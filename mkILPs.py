@@ -44,10 +44,21 @@ def process(opts, fname):
             print('Skipping %s: a heuristic already deemed it feasible.' % name)
             continue
 
-        print('Preparing model %s  (%d jobs)...' % (name, len(jobset.jobs)))
-        releases  = [j.release for j in jobset.jobs]
-        job_costs = [j.task.wcet for j in jobset.jobs]
-        deadlines = [j.deadline for j in jobset.jobs]
+        if opts.prefix_only:
+            name += '-PREFIX-%03d' % opts.prefix_only
+            # look only at the prefix of jobs released until the task with
+            # the maximum period releases its third job
+            releases  = [j.release for j in jobset.jobs[:opts.prefix_only]]
+            job_costs = [j.task.wcet for j in jobset.jobs[:opts.prefix_only]]
+            deadlines = [j.deadline for j in jobset.jobs[:opts.prefix_only]]
+            print('Preparing prefix model %s  (%d of %d jobs)...' % \
+                (name, len(releases), len(jobset.jobs)))
+        else:
+            releases  = [j.release for j in jobset.jobs]
+            job_costs = [j.task.wcet for j in jobset.jobs]
+            deadlines = [j.deadline for j in jobset.jobs]
+            print('Preparing model %s  (%d jobs)...' % (name, len(jobset.jobs)))
+
         M = jobset.taskset.hyperperiod * 10 # "big M" constant
         milp = model.make_gurobi_milp(releases, deadlines, job_costs, ncores, M, name)
 
@@ -65,11 +76,13 @@ def parse_args():
 
     parser.add_argument('-l', '--limit-job-sets', default=None,
                         action='store', type=int,
-                        help='maximum number of models to generate per configuration')
+                        help='maximum number of models to generate per '
+                             'configuration')
 
     parser.add_argument('-m', '--number-of-cores', default=None,
                         action='store', type=int,
-                        help='number of cores to assume (if not inferred from file name)')
+                        help='number of cores to assume (if not inferred from '
+                             'file name)')
 
     parser.add_argument('-o', '--output-dir', default=None,
                         action='store',
@@ -81,11 +94,18 @@ def parse_args():
 
     parser.add_argument('-s', '--skip-schedulable', default=False,
                         action='store_true',
-                        help="don't generate MILPs for workloads found schedulable by a heuristic")
+                        help="don't generate MILPs for workloads found "
+                             "schedulable by a heuristic")
 
-    parser.add_argument('-p', '--propagate-results', default=False,
+    parser.add_argument('--propagate-results', default=False,
                         action='store_true',
-                        help="create dummy .log files for workloads found schedulable by a heuristic")
+                        help="create dummy .log files for workloads found "
+                             "schedulable by a heuristic")
+
+    parser.add_argument('--prefix-only', default=False,
+                        action='store', type=int,
+                        help="generate small, incomplete MILPs for just a prefix "
+                             "of the job set")
 
     return parser.parse_args()
 
