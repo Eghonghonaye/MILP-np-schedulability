@@ -127,7 +127,7 @@ def process(opts, fname):
         name = bname.replace('.csv', '') + ('-ID%03d' % id)
         id += 1
 
-        if not opts.job_set_index is None and id != opts.job_set_index:
+        if not opts.job_set_index is None and id - 1 != opts.job_set_index:
             continue
 
         for i, j in enumerate(jobset.jobs):
