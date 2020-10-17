@@ -46,14 +46,15 @@ def intervals_of_interest(releases, deadlines, costs):
                  for d in set(deadlines))
             if ratio > 1)
 
-def make_gurobi_milp(releaseTimes, deadlines, executionTimes, ncores, M, name='RAP',
-                     with_demand_constraints=False):
-    # declare and init model
-    m = Model(name)
-
+def make_gurobi_milp(releaseTimes, deadlines, executionTimes, predecessors,
+                     ncores, M, name='RAP', with_demand_constraints=False):
     njobs = len(releaseTimes)
     assert len(deadlines) == njobs
     assert len(executionTimes) == njobs
+    assert len(predecessors) == njobs
+
+    # declare and init model
+    m = Model(name)
 
     #decision variables
     x = m.addVars(njobs, ncores, vtype=GRB.BINARY, name = "assign")
@@ -70,6 +71,11 @@ def make_gurobi_milp(releaseTimes, deadlines, executionTimes, ncores, M, name='R
     assignment = m.addConstrs(((x.sum(j,'*')) == 1 for j in range(njobs)), 'jobassign')
     starting = m.addConstrs((s[i] >= releaseTimes[i] for i in range(njobs)), 'jobstart')
     deadline = m.addConstrs((f[i] <= deadlines[i] for i in range(njobs)), 'jobdeadline')
+
+    # sequencing of DAG jobs
+    for i, preds in enumerate(predecessors):
+        # start time must exceed finish time of any predecessors
+        m.addConstr((s[i] >= f[p] for p in preds), 'pred-J%d' % i)
 
     # define max/min helpers, but only for the cases where it matters
 

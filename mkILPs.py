@@ -9,14 +9,14 @@ import load
 
 def process(opts, fname):
     bname = os.path.basename(fname)
-    m = re.match('([0-9]+)Cores', bname)
-    if m is None and opts.number_of_cores is None:
-        print('%s: Could not infer number of cores (specify with -m)' % fname)
-        return
-    elif m is None:
-        ncores = opts.number_of_cores
-    else:
-        ncores = int(m.group(1))
+    try:
+        ncores = int(next(re.finditer('([0-9]+)Cores', fname)).group(1))
+    except StopIteration:
+        if opts.number_of_cores is None:
+            print('%s: Could not infer number of cores (specify with -m)' % fname)
+            return
+        else:
+            ncores = opts.number_of_cores
 
     print('Processing %s...' % fname)
 
@@ -31,6 +31,9 @@ def process(opts, fname):
 
         name = bname.replace('.csv', '') + ('-ID%03d' % id)
         id += 1
+
+        for i, j in  enumerate(jobset.jobs):
+            j.id = i
 
         if opts.propagate_results:
             if jobset.taskset.schedulable:
@@ -51,16 +54,20 @@ def process(opts, fname):
             releases  = [j.release for j in jobset.jobs[:opts.prefix_only]]
             job_costs = [j.task.wcet for j in jobset.jobs[:opts.prefix_only]]
             deadlines = [j.deadline for j in jobset.jobs[:opts.prefix_only]]
+            predecessors = [[p.id for p in j.predecessors if p.id < opts.prefix_only]
+                            for j in jobset.jobs[:opts.prefix_only]]
             print('Preparing prefix model %s  (%d of %d jobs)...' % \
                 (name, len(releases), len(jobset.jobs)))
         else:
             releases  = [j.release for j in jobset.jobs]
             job_costs = [j.task.wcet for j in jobset.jobs]
             deadlines = [j.deadline for j in jobset.jobs]
+            predecessors = [[p.id for p in j.predecessors] for j in jobset.jobs]
             print('Preparing model %s  (%d jobs)...' % (name, len(jobset.jobs)))
 
         M = jobset.taskset.hyperperiod * 10 # "big M" constant
-        milp = model.make_gurobi_milp(releases, deadlines, job_costs, ncores, M, name)
+        milp = model.make_gurobi_milp(releases, deadlines, job_costs, predecessors,
+                                      ncores, M, name)
 
         model_fname = os.path.join(odir, '%s.%s' % (name, opts.format))
         print('Writing %s...' % model_fname)
