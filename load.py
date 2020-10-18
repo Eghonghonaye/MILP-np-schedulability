@@ -93,11 +93,14 @@ def jobs(task, horizon):
                 'cost'    : segment.wcet,
                 'task'    : task,
                 'seg_id'  : segment.id,
+                'successors' : [],
             }) for segment in task.segments]
             def by_id(id):
                 return next((s for s in segments if s.seg_id == id))
             for s, ts in zip(segments, task.segments):
                 s.predecessors = [by_id(id) for id in ts.predecessors]
+                for p in s.predecessors:
+                    p.successors.append(s)
             for s in segments:
                 yield s
         else:
@@ -107,6 +110,7 @@ def jobs(task, horizon):
                 'cost'    : task.wcet,
                 'task'    : task,
                 'predecessors' : [],
+                'successors' : [],
             })
 
 def jobsets(fname):
