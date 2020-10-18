@@ -88,8 +88,11 @@ def validate(all_jobs, allocations):
     for j, alloc in zip(all_jobs, allocations):
         assert j.id == alloc.id
         alloc.job = j
+        j.alloc = alloc
 
     allocated = set()
+    # check that all allocations are in the corresponding job's
+    # feasibility window and non-overlapping
     for alloc in allocations:
         allocated.add(alloc.job)
         # sanity check allocations
@@ -102,8 +105,14 @@ def validate(all_jobs, allocations):
                 # make sure there is no overlap
                 assert alloc.start >= other_alloc.end or \
                        other_alloc.start >= alloc.end
+    # make sure no job was missed
     for j in all_jobs:
         assert j in allocated
+    # make sure the schedule is DAG-compliant
+    for j in all_jobs:
+        # all predecessors must finish before this job's start
+        for p in j.predecessors:
+            assert p.alloc.end <= j.alloc.start
     assert len(allocated) == len(all_jobs)
 
 def process(opts, fname):
