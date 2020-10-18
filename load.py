@@ -123,4 +123,5 @@ def jobsets(fname):
         yield as_object({
             'taskset' : ts,
             'jobs'    : jobset,
+            'is_dag'  : any((t.segments for t in ts.tasks))
         })

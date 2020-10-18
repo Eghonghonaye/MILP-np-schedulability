@@ -8,7 +8,8 @@ import ast
 
 from collections import defaultdict
 
-from backfill import paf_backfill
+from backfill import paf_backfill as backfill
+from dagfill import paf_backfill as dagfill
 
 import load
 from load import as_object
@@ -117,14 +118,14 @@ def validate(all_jobs, allocations):
 
 def process(opts, fname):
     bname = os.path.basename(fname)
-    m = re.match('([0-9]+)Cores', bname)
-    if m is None and opts.number_of_cores is None:
-        print('%s: Could not infer number of cores (specify with -m)' % fname)
-        return
-    elif m is None:
-        ncores = opts.number_of_cores
-    else:
-        ncores = int(m.group(1))
+    try:
+        ncores = int(next(re.finditer('([0-9]+)Cores', fname)).group(1))
+    except StopIteration:
+        if opts.number_of_cores is None:
+            print('%s: Could not infer number of cores (specify with -m)' % fname)
+            return
+        else:
+            ncores = opts.number_of_cores
 
     if not opts.compare:
         print('Processing %s...' % fname)
@@ -166,7 +167,10 @@ def process(opts, fname):
 
         if not allocations and opts.heuristic:
             print('Trying to schedule %s (%d jobs)...' % (name, len(jobset.jobs)))
-            (unassigned, schedule, _) = paf_backfill(jobset.jobs, ncores)
+            if jobset.is_dag:
+                (unassigned, schedule, _) = dagfill(jobset.jobs, ncores)
+            else:
+                (unassigned, schedule, _) = backfill(jobset.jobs, ncores)
             if not unassigned:
                 allocations = heuristic_solution(schedule)
 
@@ -180,6 +184,7 @@ def process(opts, fname):
 
             with open(sched_name, 'w') as f:
                 show(opts, allocations, file=f)
+            print('%s: solution stored in %s' % (name, sched_name))
         else:
             print('%s: no solution found.' % name)
 
