@@ -135,7 +135,10 @@ def process(opts, fname):
 
     id = 1
     for jobset in load.jobsets(fname):
-        name = bname.replace('.csv', '') + ('-ID%03d' % id)
+        if bname.startswith('Run'):
+            name = os.path.basename(fname.replace('/Run_', '-ID')).replace('.csv', '')
+        else:
+            name = bname.replace('.csv', '') + ('-ID%03d' % id)
         id += 1
 
         if not opts.job_set_index is None and id - 1 != opts.job_set_index:
