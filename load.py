@@ -79,7 +79,7 @@ def tasksets(fname):
         rows = list(csv.reader(f, delimiter=','))
         if rows[0][0] == 'T':
             # this looks like a DAG task set
-            yield taskset_dag(rows)
+            return [taskset_dag(rows)]
         else:
             # must be a non-DAG task set
             return tasksets_orig(rows)
