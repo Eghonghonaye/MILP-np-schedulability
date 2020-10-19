@@ -29,7 +29,10 @@ def process(opts, fname):
             print('Reached job set limit (%d), stopping.' % opts.limit_job_sets)
             break
 
-        name = bname.replace('.csv', '') + ('-ID%03d' % id)
+        if bname.startswith('Run'):
+            name = os.path.basename(fname.replace('/Run_', '-ID')).replace('.csv', '')
+        else:
+            name = bname.replace('.csv', '') + ('-ID%03d' % id)
         id += 1
 
         for i, j in  enumerate(jobset.jobs):
