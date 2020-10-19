@@ -190,6 +190,10 @@ def process(opts, fname):
             print('%s: solution stored in %s' % (name, sched_name))
         else:
             print('%s: no solution found.' % name)
+            if opts.log_failures:
+                f = open(sched_name.replace('.csv', '.nosol'), 'w')
+                f.write('no solution found')
+                f.close()
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -218,6 +222,10 @@ def parse_args():
     parser.add_argument('--heuristic', default=None,
                         action='store_true',
                         help='run a scheduling heuristic')
+
+    parser.add_argument('-f', '--log-failures', default=None,
+                        action='store_true',
+                        help='write *.nosol failure indicators')
 
     parser.add_argument('--compare', default=None,
                         action='store_true',

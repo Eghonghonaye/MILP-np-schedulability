@@ -12,6 +12,7 @@ class Outcome(IntEnum):
     FEASIBLE   = 1
     INFEASIBLE = 2
     INCOMPLETE = 3
+    UNSOLVED   = 4
 
 def parse_outcome(fname):
     with open(fname, 'r') as f:
@@ -26,7 +27,7 @@ def parse_outcome(fname):
             # could not figure out outcome
             return Outcome.INCOMPLETE
 
-FNAME_PATTERN = re.compile(r'([0-9]+)Cores([0-9]+)Tasks([0-9]+)-ID([0-9]+).*(\.log|-schedule\.csv)')
+FNAME_PATTERN = re.compile(r'([0-9]+)Cores([0-9]+)Tasks([0-9]+)-ID([0-9]+).*(\.log|-schedule\.csv|-schedule.nosol)')
 
 def parse_config(fname):
     m = FNAME_PATTERN.match(os.path.basename(fname))
@@ -35,27 +36,38 @@ def parse_config(fname):
     tasks = int(m.group(2))
     util  = int(m.group(3))
     id    = int(m.group(4))
-    kind  = 'log' if 'log' in m.group(5) else 'schedule'
+    if 'log' in m.group(5):
+        kind = 'log'
+    elif 'schedule.csv' in m.group(5):
+        kind  = 'schedule'
+    elif 'schedule.nosol' in m.group(5):
+        kind  = 'failure-marker'
+    else:
+        assert False # don't know what to make of this
     return (cores, tasks, util, id, kind)
 
 def count_results(opts):
-    results = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: ([], [], [], []))))
+    results = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: ([], [], [], [], []))))
     for f in opts.input_files:
         cores, tasks, util, id, kind = parse_config(f)
         if kind == 'log':
             outcome = parse_outcome(f)
-        else:
+        elif kind == 'schedule':
             # in case of a schedule, existence implies feasibility
             outcome = Outcome.FEASIBLE
+        else:
+            # the heuristic couldn't solve it
+            outcome = Outcome.UNSOLVED
         results[cores][tasks][util][outcome].append(id)
     return results
 
 def print_results(opts, results):
-    print("%6s,%6s,%5s,%9s,%11s,%10s,%11s,%6s,%18s" % (
+    print("%6s,%6s,%5s,%9s,%18s,%11s,%10s,%11s,%6s,%18s" % (
         'Cores',
         'Tasks',
         'Util',
         'Feasible',
+        'Heuristic-failed',
         'Infeasible',
         'Timed-out',
         'Incomplete',
@@ -69,12 +81,14 @@ def print_results(opts, results):
                 infeas  = len(results[cores][tasks][util][Outcome.INFEASIBLE])
                 timeout = len(results[cores][tasks][util][Outcome.TIMEOUT])
                 incomp  = len(results[cores][tasks][util][Outcome.INCOMPLETE])
-                total = feas + infeas + timeout + incomp if not opts.total else opts.total
-                print("%6d,%6d,%5d,%9d,%11d,%10d,%11d,%6d,%18.4f" % (
+                unsolved = len(results[cores][tasks][util][Outcome.UNSOLVED])
+                total = feas + infeas + timeout + incomp + unsolved if not opts.total else opts.total
+                print("%6d,%6d,%5d,%9d,%18d,%11d,%10d,%11d,%6d,%18.4f" % (
                     cores,
                     tasks,
                     util,
                     feas,
+                    unsolved,
                     infeas,
                     timeout,
                     incomp,
