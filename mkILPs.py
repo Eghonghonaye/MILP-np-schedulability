@@ -52,7 +52,7 @@ def process(opts, fname):
             # look only at the prefix of jobs released until the task with
             # the maximum period releases its third job
             releases  = [j.release for j in jobset.jobs[:opts.prefix_only]]
-            job_costs = [j.task.wcet for j in jobset.jobs[:opts.prefix_only]]
+            job_costs = [j.cost for j in jobset.jobs[:opts.prefix_only]]
             deadlines = [j.deadline for j in jobset.jobs[:opts.prefix_only]]
             predecessors = [[p.id for p in j.predecessors if p.id < opts.prefix_only]
                             for j in jobset.jobs[:opts.prefix_only]]
@@ -60,7 +60,7 @@ def process(opts, fname):
                 (name, len(releases), len(jobset.jobs)))
         else:
             releases  = [j.release for j in jobset.jobs]
-            job_costs = [j.task.wcet for j in jobset.jobs]
+            job_costs = [j.cost for j in jobset.jobs]
             deadlines = [j.deadline for j in jobset.jobs]
             predecessors = [[p.id for p in j.predecessors] for j in jobset.jobs]
             print('Preparing model %s  (%d jobs)...' % (name, len(jobset.jobs)))

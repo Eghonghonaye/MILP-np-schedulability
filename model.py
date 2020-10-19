@@ -75,7 +75,7 @@ def make_gurobi_milp(releaseTimes, deadlines, executionTimes, predecessors,
     # sequencing of DAG jobs
     for i, preds in enumerate(predecessors):
         # start time must exceed finish time of any predecessors
-        m.addConstr((s[i] >= f[p] for p in preds), 'pred-J%d' % i)
+        m.addConstrs((s[i] >= f[p] for p in preds), 'pred-J%d' % i)
 
     # define max/min helpers, but only for the cases where it matters
 
