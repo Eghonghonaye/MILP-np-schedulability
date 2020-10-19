@@ -41,29 +41,37 @@ def backfill_latest_fit(jobs, schedule, all_jobs):
     return (unassigned, schedule)
 
 
-def paf_backfill(jobs, cores, heuristic=backfill_latest_fit):
+def paf_meta_heuristic(jobs, cores, heuristic=backfill_latest_fit):
     difficult = set()
     regular   = set(jobs)
     give_up = False
+
+    def difficult_succs(j):
+        for s in j.successors:
+            if not s in difficult:
+                difficult.add(s)
+                regular.remove(s)
+                difficult_succs(s)
+
     while not give_up:
         # first, create an empty schedule
         schedule = {}
         for core in range(cores):
             schedule[core] = []
-        print('+' * 80)
         init_feas(jobs, cores)
-        print('Pre')
         # pre-allocate the difficult ones
         (unassigned1, schedule) = heuristic(difficult, schedule, jobs)
         if unassigned1:
             # can't even pre-allocate, this is getting too difficult
             give_up = True
-        print('-' * 80)
         # now try allocating the rest
         (unassigned2, schedule) = heuristic(regular, schedule, jobs)
         # see if we found anything new that's difficult
         difficult |= unassigned2
         regular   -= unassigned2
+        # make sure we get all the successors, too, rather than discovering them slowly
+        for j in unassigned2:
+            difficult_succs(j)
         if not unassigned2:
             # we found a feasible schedule!
             break

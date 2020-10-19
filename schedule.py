@@ -8,8 +8,10 @@ import ast
 
 from collections import defaultdict
 
-from feasint import paf_backfill as backfill
-from dagfill import paf_backfill as dagfill
+import backfill
+import feasint
+import dagfill
+import dagfeasint
 
 import load
 from load import as_object
@@ -170,10 +172,17 @@ def process(opts, fname):
 
         if not allocations and opts.heuristic:
             print('Trying to schedule %s (%d jobs)...' % (name, len(jobset.jobs)))
-            if jobset.is_dag:
-                (unassigned, schedule, _) = dagfill(jobset.jobs, ncores)
+            if jobset.is_dag and opts.heuristic == 'backfill':
+                (unassigned, schedule, _) = dagfill.paf_meta_heuristic(jobset.jobs, ncores)
+            elif jobset.is_dag and opts.heuristic == 'feasint':
+                (unassigned, schedule, _) = dagfeasint.paf_meta_heuristic(jobset.jobs, ncores)
+            elif not jobset.is_dag and  opts.heuristic == 'backfill':
+                (unassigned, schedule, _) = backfill.paf_meta_heuristic(jobset.jobs, ncores)
+            elif not jobset.is_dag and opts.heuristic == 'feasint':
+                (unassigned, schedule, _) = feasint.paf_meta_heuristic(jobset.jobs, ncores)
             else:
-                (unassigned, schedule, _) = backfill(jobset.jobs, ncores)
+                assert False
+
             if not unassigned:
                 allocations = heuristic_solution(schedule)
 
@@ -220,7 +229,8 @@ def parse_args():
                         help='where to find the MILP solutions, if any')
 
     parser.add_argument('--heuristic', default=None,
-                        action='store_true',
+                        action='store',
+                        choices=['backfill', 'feasint'],
                         help='run a scheduling heuristic')
 
     parser.add_argument('-f', '--log-failures', default=None,

@@ -52,7 +52,7 @@ def backfill_first_fit(jobs, schedule):
     return (unassigned, schedule)
 
 
-def paf_backfill(jobs, cores, heuristic=backfill_first_fit):
+def paf_meta_heuristic(jobs, cores, heuristic=backfill_first_fit):
     difficult = set()
     regular   = set(jobs)
     give_up = False

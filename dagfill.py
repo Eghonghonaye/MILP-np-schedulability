@@ -83,7 +83,7 @@ def update_dag_constraints(alloc):
     for s in j.successors:
         s.dag_release = max(s.dag_release, start_time + j.cost)
 
-def paf_backfill(jobs, cores, heuristic=backfill_first_fit):
+def paf_meta_heuristic(jobs, cores, heuristic=backfill_first_fit):
     difficult = set()
     regular   = set(jobs)
     give_up = False
