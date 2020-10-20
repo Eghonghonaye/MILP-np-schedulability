@@ -96,6 +96,37 @@ def print_results(opts, results):
                     feas / total
                 ))
 
+def print_all(opts, results):
+    print("%6s,%6s,%5s,%4s,%9s,%17s,%11s,%10s" % (
+        'Cores',
+        'Tasks',
+        'Util',
+        'ID',
+        'Feasible',
+        'Heuristic-failed',
+        'Infeasible',
+        'Timed-out',
+    ))
+    for cores in sorted(results.keys()):
+        for tasks in sorted(results[cores].keys()):
+            for util in sorted(results[cores][tasks].keys()):
+                all_ids = []
+                for kind in Outcome:
+                    for id in results[cores][tasks][util][kind]:
+                        all_ids.append(id)
+                for id in sorted(all_ids):
+                    print("%6d,%6d,%5d,%4d,%9d,%17d,%11d,%10d" % (
+                        cores,
+                        tasks,
+                        util,
+                        id,
+                        id in results[cores][tasks][util][Outcome.FEASIBLE],
+                        id in results[cores][tasks][util][Outcome.UNSOLVED],
+                        id in results[cores][tasks][util][Outcome.INFEASIBLE],
+                        id in results[cores][tasks][util][Outcome.TIMEOUT],
+                    ))
+
+
 def list(opts):
     for fname in opts.input_files:
         outcome = parse_outcome(fname)
@@ -126,6 +157,10 @@ def parse_args():
                         action='store_true',
                         help='output list of models that timed out')
 
+    parser.add_argument('-a', '--list-all', default=False,
+                        action='store_true',
+                        help="don't summarize results")
+
     parser.add_argument('--total', default=None,
                         action='store', type=int,
                         help='total to assume for schedulability purposes')
@@ -138,7 +173,10 @@ def main():
         list(opts)
     else:
         r = count_results(opts)
-        print_results(opts, r)
+        if opts.list_all:
+            print_all(opts, r)
+        else:
+            print_results(opts, r)
 
 if __name__ == '__main__':
     main()
