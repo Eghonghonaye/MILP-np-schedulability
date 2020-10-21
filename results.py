@@ -136,6 +136,9 @@ def list(opts):
             print(fname)
         if opts.list_timeouts and outcome == Outcome.TIMEOUT:
             print(fname)
+        if opts.list_incomplete and outcome == Outcome.INCOMPLETE:
+            print(fname)
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -157,6 +160,10 @@ def parse_args():
                         action='store_true',
                         help='output list of models that timed out')
 
+    parser.add_argument('--list-incomplete', default=False,
+                        action='store_true',
+                        help="output list of models that haven't finished yet")
+
     parser.add_argument('-a', '--list-all', default=False,
                         action='store_true',
                         help="don't summarize results")
@@ -169,7 +176,8 @@ def parse_args():
 
 def main():
     opts = parse_args()
-    if opts.list_feasible or opts.list_infeasible or opts.list_timeouts:
+    if opts.list_feasible or opts.list_infeasible or opts.list_timeouts or\
+       opts.list_incomplete:
         list(opts)
     else:
         r = count_results(opts)

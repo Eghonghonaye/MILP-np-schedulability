@@ -50,6 +50,13 @@ def process(opts, fname):
             print('Skipping %s: a heuristic already deemed it feasible.' % name)
             continue
 
+        if opts.skip_schedulable and opts.heuristics_results:
+            # check if a schedule for this workload already exists
+            sched_name = os.path.join(opts.heuristics_results, name + '-schedule.csv')
+            if os.path.exists(sched_name):
+                print('Skipping %s: a heuristic already found a schedule.' % name)
+                continue
+
         if opts.prefix_only:
             name += '-PREFIX-%03d' % opts.prefix_only
             # look only at the prefix of jobs released until the task with
@@ -97,6 +104,10 @@ def parse_args():
     parser.add_argument('-o', '--output-dir', default=None,
                         action='store',
                         help='where to store the generated problems')
+
+    parser.add_argument('-r', '--heuristics-results', default=None,
+                        action='store',
+                        help='where to look for heuristic results')
 
     parser.add_argument('-f', '--format', default='lp',
                         choices=['lp', 'mps'],

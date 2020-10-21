@@ -3,7 +3,7 @@
 set -e
 
 # timeout
-LIMIT_HOURS=2
+LIMIT_HOURS=3
 # timeout, in seconds
 LIMIT=$((LIMIT_HOURS * 60 * 60))
 
