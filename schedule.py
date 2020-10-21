@@ -174,14 +174,10 @@ def process(opts, fname):
 
         def run_heuristic():
             print('Trying to schedule %s (%d jobs)...' % (name, len(jobset.jobs)))
-            if jobset.is_dag and opts.heuristic == 'backfill':
+            if opts.heuristic == 'backfill':
                 (unassigned, schedule, _) = dagfill.paf_meta_heuristic(jobset.jobs, ncores)
-            elif jobset.is_dag and opts.heuristic == 'feasint':
+            elif opts.heuristic == 'feasint':
                 (unassigned, schedule, _) = dagfeasint.paf_meta_heuristic(jobset.jobs, ncores)
-            elif not jobset.is_dag and  opts.heuristic == 'backfill':
-                (unassigned, schedule, _) = backfill.paf_meta_heuristic(jobset.jobs, ncores)
-            elif not jobset.is_dag and opts.heuristic == 'feasint':
-                (unassigned, schedule, _) = feasint.paf_meta_heuristic(jobset.jobs, ncores)
             else:
                 assert False
 
