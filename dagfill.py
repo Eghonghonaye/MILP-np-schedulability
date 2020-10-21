@@ -48,10 +48,12 @@ def backfill_first_fit(jobs, schedule):
         if not j:
             break
         success = False
-        for core in schedule:
-            if backfill_job(j, schedule[core], queue):
-                success = True
-                break
+        if j.succ_count == 0:
+            # can only schedule jobs with unallocated successors
+            for core in schedule:
+                if backfill_job(j, schedule[core], queue):
+                    success = True
+                    break
         if not success:
             unassigned.add(j)
     return (unassigned, schedule)
@@ -94,6 +96,14 @@ def update_dag_constraints(alloc, queue):
 def paf_meta_heuristic(jobs, cores, heuristic=backfill_first_fit):
     difficult = set()
     regular   = set(jobs)
+
+    def difficult_succs(j):
+        for s in j.successors:
+            if not s in difficult:
+                difficult.add(s)
+                regular.remove(s)
+                difficult_succs(s)
+
     give_up = False
     while not give_up:
         # first, create an empty schedule
@@ -112,6 +122,8 @@ def paf_meta_heuristic(jobs, cores, heuristic=backfill_first_fit):
         # see if we found anything new that's difficult
         difficult |= unassigned2
         regular   -= unassigned2
+        for j in unassigned2:
+            difficult_succs(j)
         if not unassigned2:
             # we found a feasible schedule!
             break
