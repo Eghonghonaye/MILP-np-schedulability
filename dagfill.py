@@ -1,13 +1,18 @@
 from backfill import overlap, conflicts
 
+from order import ConsiderationOrder
+
 def backfill_order_criterion(j):
     # sort by later deadline, tie-break by later release, then by cost
-    return (j.dag_deadline, j.dag_release, j.cost)
+    return (
+        j.succ_count,
+        -j.dag_deadline,
+        -j.dag_release,
+        -j.cost,
+        j.id, # make sure there are no ties
+    )
 
-def select_next_job(jobs):
-    return max(jobs, key=backfill_order_criterion, default=None)
-
-def backfill_job(j, sched):
+def backfill_job(j, sched, queue):
     # assumption: sched is a list of non-overlapping (job, start-time) tuples
     # let's look at only relevant jobs that overlap with j's feasibility window
     relevant = ((sj, start) for (sj, start) in sched
@@ -17,7 +22,7 @@ def backfill_job(j, sched):
     if j.dag_deadline - j.cost >= j.dag_release and \
        not conflicts(j.dag_deadline - j.cost, j.cost, relevant):
         alloc = (j, j.dag_deadline - j.cost)
-        update_dag_constraints(alloc)
+        update_dag_constraints(alloc, queue)
         sched.append(alloc)
         return True
     # nope, something's in the way
@@ -28,29 +33,24 @@ def backfill_job(j, sched):
         if candidate + j.cost <= j.dag_deadline and \
            not conflicts(candidate, j.cost, relevant):
             alloc = (j, candidate)
-            update_dag_constraints(alloc)
+            update_dag_constraints(alloc, queue)
             sched.append(alloc)
             return True
     # nope, nothing worked
     return False
 
 def backfill_first_fit(jobs, schedule):
-    remaining = set(jobs)
     unassigned = set()
-    while remaining:
-        # look at the set of remaining jobs without unplaced successors
-        candidates = (j for j in remaining
-                      if not any((s in remaining for s in j.successors)))
+    queue = ConsiderationOrder(backfill_order_criterion, jobs)
+
+    while True:
         # select next job to consider
-        j = select_next_job(candidates)
+        j = queue.next()
         if not j:
-            # uh oh, couldn't assign the rest, no more candidates to try
-            unassigned |= remaining
             break
-        remaining.remove(j)
         success = False
         for core in schedule:
-            if backfill_job(j, schedule[core]):
+            if backfill_job(j, schedule[core], queue):
                 success = True
                 break
         if not success:
@@ -75,13 +75,22 @@ def prep_dag(jobs):
         j.dag_deadline = latest_finish(j)
         j.dag_release  = earliest_start(j)
 
-def update_dag_constraints(alloc):
+    for j in jobs:
+        j.succ_count = len(j.successors)
+
+
+def update_dag_constraints(alloc, queue):
     # update feasibility window of related jobs when job was placed
     j, start_time = alloc
     for p in j.predecessors:
-        p.dag_deadline = min(p.dag_deadline, start_time)
+        if p.in_queue:
+            p.dag_deadline = min(p.dag_deadline, start_time)
+            p.succ_count -= 1
+            queue.update(p)
     for s in j.successors:
-        s.dag_release = max(s.dag_release, start_time + j.cost)
+        if s.in_queue:
+            s.dag_release = max(s.dag_release, start_time + j.cost)
+            queue.update(s)
 
 def paf_meta_heuristic(jobs, cores, heuristic=backfill_first_fit):
     difficult = set()
