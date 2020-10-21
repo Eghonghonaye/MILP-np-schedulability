@@ -13,6 +13,8 @@ import feasint
 import dagfill
 import dagfeasint
 
+import cProfile
+
 import load
 from load import as_object
 
@@ -170,7 +172,7 @@ def process(opts, fname):
                 print(name, 'solved by prior heuristics')
             continue
 
-        if not allocations and opts.heuristic:
+        def run_heuristic():
             print('Trying to schedule %s (%d jobs)...' % (name, len(jobset.jobs)))
             if jobset.is_dag and opts.heuristic == 'backfill':
                 (unassigned, schedule, _) = dagfill.paf_meta_heuristic(jobset.jobs, ncores)
@@ -184,7 +186,17 @@ def process(opts, fname):
                 assert False
 
             if not unassigned:
-                allocations = heuristic_solution(schedule)
+                return heuristic_solution(schedule)
+            else:
+                return None
+
+        if not allocations and opts.heuristic:
+            if opts.profile:
+                with cProfile.Profile() as pr:
+                    allocations = run_heuristic()
+                pr.print_stats('cumulative')
+            else:
+                allocations = run_heuristic()
 
         if allocations:
             validate(jobset.jobs, allocations)
@@ -240,6 +252,10 @@ def parse_args():
     parser.add_argument('--compare', default=None,
                         action='store_true',
                         help='compare against schedulability flag')
+
+    parser.add_argument('--profile', default=None,
+                        action='store_true',
+                        help="run Python's cProfile profiler")
 
     parser.add_argument('-l', '--load-milp-sol', default=None,
                         action='store_true',
