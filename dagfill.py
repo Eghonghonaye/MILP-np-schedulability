@@ -9,7 +9,6 @@ def backfill_order_criterion(j):
         -j.dag_deadline,
         -j.dag_release,
         -j.cost,
-        j.id, # make sure there are no ties
     )
 
 def backfill_job(j, sched, queue):

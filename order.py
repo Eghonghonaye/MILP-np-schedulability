@@ -11,18 +11,20 @@ class ConsiderationOrder(object):
                 self.add(j)
 
     def add(self, job):
-        item = [self.score_function(job), job]
+        item = [self.score_function(job), job.id, job]
         heappush(self.queue, item)
         job.in_queue = item
 
     def update(self, job):
-        job.in_queue[1] = None
+        del job.in_queue[2]
         self.add(job)
 
     def next(self):
         job = None
         while self.queue and not job:
-            _, job = heappop(self.queue)
-        if job:
-            job.in_queue = False
+            item = heappop(self.queue)
+            if len(item) > 2:
+                job = item[2]
+                job.in_queue = False
+
         return job
