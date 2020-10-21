@@ -13,11 +13,11 @@ def init_feas(jobs, cores):
             j.feasibility[core] = [[j.release, j.deadline - j.cost]]
 
 
-def update_feas(core, scheduled_job, start_time, queue):
+def update_feas(core, scheduled_job, start_time, queue, later_jobs):
     end_time = start_time + scheduled_job.cost
 
     for j in scheduled_job.overlapping_jobs:
-        if j.in_queue:
+        if j.in_queue or j in later_jobs:
             updated = False
             deleted = 0
             blocked = [start_time - j.cost, end_time]
@@ -59,13 +59,13 @@ def update_feas(core, scheduled_job, start_time, queue):
             # check wether we lost a core
             if deleted and not j.feasibility[core]:
                 j.feas_cores -= 1
-            if updated:
+            if updated and j.in_queue:
                 queue.update(j)
 
-def update_dag_constraints(j, start_time, queue):
+def update_dag_constraints(j, start_time, queue, later_jobs):
     end_time = start_time + j.cost
     for p in j.predecessors:
-        if p.in_queue:
+        if p.in_queue or j in later_jobs:
             p.succ_count -= 1
             for c in p.feasibility:
                 updated = ([a, min(b, start_time - p.cost)] for a, b in p.feasibility[c])
@@ -73,16 +73,18 @@ def update_dag_constraints(j, start_time, queue):
             p.feas_cores = sum((1 for c in p.feasibility if p.feasibility[c]))
             p.feas_region = sum( (sum((b - a for (a, b) in p.feasibility[c]))
                                   for c in p.feasibility) )
-            queue.update(p)
+            if p.in_queue:
+                queue.update(p)
     for s in j.successors:
-        if s.in_queue:
+        if s.in_queue or j in later_jobs:
             for c in s.feasibility:
                 updated = ([max(a, end_time), b] for (a, b) in s.feasibility[c])
                 s.feasibility[c] = [[a, b] for a, b in updated if a <= b]
-            s.feas_cores = sum((1 for c in p.feasibility if s.feasibility[c]))
+            s.feas_cores = sum((1 for c in s.feasibility if s.feasibility[c]))
             s.feas_region = sum( (sum((b - a for (a, b) in s.feasibility[c]))
                                   for c in s.feasibility) )
-            queue.update(s)
+            if s.in_queue:
+                queue.update(s)
 
 def latest_startpoint(job):
     per_core = ((c, max(job.feasibility[c], key=lambda x: x[1]))
@@ -109,7 +111,7 @@ def order_criterion(j):
         -j.cost,
     )
 
-def backfill_latest_fit(jobs, schedule):
+def backfill_latest_fit(jobs, schedule, later_jobs=set()):
     unassigned = set()
     queue = ConsiderationOrder(order_criterion, jobs)
 
@@ -123,9 +125,9 @@ def backfill_latest_fit(jobs, schedule):
             core, (_, start_time) = latest_pos
             schedule[core].append((j, start_time))
             # update the feasibility windows of predecessors and successors
-            update_dag_constraints(j, start_time, queue)
+            update_dag_constraints(j, start_time, queue, later_jobs)
             # reduce the feasibility windows of everyone else
-            update_feas(core, j, start_time, queue)
+            update_feas(core, j, start_time, queue, later_jobs)
         else:
             unassigned.add(j)
 
@@ -152,7 +154,7 @@ def paf_meta_heuristic(jobs, cores, heuristic=backfill_latest_fit):
             schedule[core] = []
         init_feas(jobs, cores)
         # pre-allocate the difficult ones
-        (unassigned1, schedule) = heuristic(difficult, schedule)
+        (unassigned1, schedule) = heuristic(difficult, schedule, regular)
         if unassigned1:
             # can't even pre-allocate, this is getting too difficult
             give_up = True
