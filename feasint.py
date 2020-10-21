@@ -1,3 +1,5 @@
+from itertools import combinations
+
 from backfill import overlap, conflicts
 
 def init_feas(jobs, cores):
@@ -17,10 +19,10 @@ def feas_score(j):
                          for c in j.feasibility) )
     return feasible_cores, total_region
 
-def update_feas(jobs, core, scheduled_job, start_time):
+def update_feas(core, scheduled_job, start_time):
     end_time = start_time + scheduled_job.cost
 
-    for j in jobs:
+    for j in scheduled_job.overlapping_jobs:
         updated = []
         for (a, b) in j.feasibility[core]:
             if a <= start_time and b <= end_time:
@@ -45,6 +47,16 @@ def latest_startpoint(job):
                 for c in job.feasibility if job.feasibility[c])
     return max(per_core, key=lambda x: x[1][1], default=None)
 
+def init_overlap(jobs):
+    for j in jobs:
+        j.overlapping_jobs = []
+    for j1, j2 in combinations(jobs, 2):
+        feas1 = (j1.release, j1.deadline)
+        feas2 = (j2.release, j2.deadline)
+        if overlap(feas1, feas2):
+            j1.overlapping_jobs.append(j2)
+            j2.overlapping_jobs.append(j1)
+
 def order_criterion(j):
     fcores, tfeas = feas_score(j)
     latest_pos = latest_startpoint(j)
@@ -58,7 +70,7 @@ def order_criterion(j):
 def select_next_job(jobs):
     return max(jobs, key=order_criterion, default=None)
 
-def backfill_latest_fit(jobs, schedule, all_jobs):
+def backfill_latest_fit(jobs, schedule):
     remaining = set(jobs)
     unassigned = set()
     while remaining:
@@ -69,7 +81,7 @@ def backfill_latest_fit(jobs, schedule, all_jobs):
             core, (_, start_time) = latest_pos
             schedule[core].append((j, start_time))
             # reduce the feasibility windows of everyone else
-            update_feas(all_jobs, core, j, start_time)
+            update_feas(core, j, start_time)
         else:
             unassigned.add(j)
 
@@ -87,6 +99,8 @@ def paf_meta_heuristic(jobs, cores, heuristic=backfill_latest_fit):
                 regular.remove(s)
                 difficult_succs(s)
 
+    init_overlap(jobs)
+
     give_up = False
     while not give_up:
         # first, create an empty schedule
@@ -95,12 +109,12 @@ def paf_meta_heuristic(jobs, cores, heuristic=backfill_latest_fit):
             schedule[core] = []
         init_feas(jobs, cores)
         # pre-allocate the difficult ones
-        (unassigned1, schedule) = heuristic(difficult, schedule, jobs)
+        (unassigned1, schedule) = heuristic(difficult, schedule)
         if unassigned1:
             # can't even pre-allocate, this is getting too difficult
             give_up = True
         # now try allocating the rest
-        (unassigned2, schedule) = heuristic(regular, schedule, jobs)
+        (unassigned2, schedule) = heuristic(regular, schedule)
         # see if we found anything new that's difficult
         difficult |= unassigned2
         regular   -= unassigned2

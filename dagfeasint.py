@@ -1,6 +1,6 @@
 from backfill import overlap, conflicts
 
-from feasint import init_feas, select_next_job, update_feas, latest_startpoint
+from feasint import init_feas, select_next_job, update_feas, latest_startpoint, init_overlap
 
 def update_dag_constraints(j, start_time):
     end_time = start_time + j.cost
@@ -13,7 +13,7 @@ def update_dag_constraints(j, start_time):
             updated = ((max(a, end_time), b) for (a, b) in s.feasibility[c])
             s.feasibility[c] = [(a, b) for (a, b) in updated if a <= b]
 
-def backfill_latest_fit(jobs, schedule, all_jobs):
+def backfill_latest_fit(jobs, schedule):
     remaining = set(jobs)
     unassigned = set()
     while remaining:
@@ -32,7 +32,7 @@ def backfill_latest_fit(jobs, schedule, all_jobs):
             core, (_, start_time) = latest_pos
             schedule[core].append((j, start_time))
             # reduce the feasibility windows of everyone else
-            update_feas(all_jobs, core, j, start_time)
+            update_feas(core, j, start_time)
             # update the feasibility windows of predecessors and successors
             update_dag_constraints(j, start_time)
         else:
@@ -53,6 +53,8 @@ def paf_meta_heuristic(jobs, cores, heuristic=backfill_latest_fit):
                 regular.remove(s)
                 difficult_succs(s)
 
+    init_overlap(jobs)
+
     while not give_up:
         # first, create an empty schedule
         schedule = {}
@@ -60,12 +62,12 @@ def paf_meta_heuristic(jobs, cores, heuristic=backfill_latest_fit):
             schedule[core] = []
         init_feas(jobs, cores)
         # pre-allocate the difficult ones
-        (unassigned1, schedule) = heuristic(difficult, schedule, jobs)
+        (unassigned1, schedule) = heuristic(difficult, schedule)
         if unassigned1:
             # can't even pre-allocate, this is getting too difficult
             give_up = True
         # now try allocating the rest
-        (unassigned2, schedule) = heuristic(regular, schedule, jobs)
+        (unassigned2, schedule) = heuristic(regular, schedule)
         # see if we found anything new that's difficult
         difficult |= unassigned2
         regular   -= unassigned2
