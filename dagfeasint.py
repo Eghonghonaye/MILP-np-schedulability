@@ -3,49 +3,86 @@ from itertools import combinations
 from backfill import overlap, conflicts
 from order import ConsiderationOrder
 
-
 def init_feas(jobs, cores):
     for j in jobs:
         j.succ_count = len(j.successors)
         j.feasibility = {}
+        j.feas_cores = cores
+        j.feas_region = (j.deadline - j.cost - j.release) * cores
         for core in range(cores):
-            j.feasibility[core] = [(j.release, j.deadline - j.cost)]
+            j.feasibility[core] = [[j.release, j.deadline - j.cost]]
 
-def feas_score(j):
-    total = 0
-    for core in j.feasibility:
-        for (a, b) in  j.feasibility[core]:
-            assert b >= a
-            total += b - a + 1
-    feasible_cores = sum((1 for c in j.feasibility if j.feasibility[c]))
-    total_region = sum( (sum((b - a + 1 for (a, b) in j.feasibility[c]))
-                         for c in j.feasibility) )
-    return feasible_cores, total_region
 
 def update_feas(core, scheduled_job, start_time, queue):
     end_time = start_time + scheduled_job.cost
 
     for j in scheduled_job.overlapping_jobs:
         if j.in_queue:
-            updated = []
-            for (a, b) in j.feasibility[core]:
-                if a <= start_time and b <= end_time:
+            updated = False
+            deleted = 0
+            blocked = [start_time - j.cost, end_time]
+            for i in range(len(j.feasibility[core])):
+                region = j.feasibility[core][i - deleted]
+                a, b = region
+                if a < blocked[0] and blocked[1] < b:
+                    # falls squarely in the middle
+                    # split in two parts
+                    # update first
+                    region[1] = blocked[0]
+                    # add new for second
+                    j.feasibility[core].append([blocked[1], b])
+                    j.feas_region -= blocked[1] - blocked[0]
+                    updated = True
+                elif a <= blocked[0] and b <= blocked[1]:
                     # possible overlap at the end
-                    updated.append((a, min(b, start_time - j.cost)))
-                elif start_time <= a and end_time <= b:
+                    b2 = min(b, blocked[0])
+                    if b2 < b:
+                        updated = True
+                        region[1] = b2
+                        j.feas_region -= b - b2
+                elif a <= blocked[1] <= b:
                     # possible overlap at the beginning
-                    updated.append((max(a, end_time), b))
-                elif start_time <= a and b <= end_time:
-                    # completely covered => infeasible, nothing to add
-                    pass
-                elif a <= start_time <= end_time <= b:
-                    # possible split in two intervals
-                    updated.append((a, start_time - j.cost))
-                    updated.append((end_time, b))
+                    a2 = max(a, blocked[1])
+                    if a2 > a:
+                        updated = True
+                        region[0] = a2
+                        j.feas_region -= a2 - a
+                elif blocked[0] < a and b < blocked[1]:
+                    # completely covered => infeasible, remove
+                    del j.feasibility[core][i - deleted]
+                    deleted += 1
+                    j.feas_region -= b - a
+                    updated = True
                 else:
-                    assert False
-            j.feasibility[core] = [(a, b) for (a, b) in updated if a <= b]
-            queue.update(j)
+                    # not overlapping, nothing to do
+                    pass
+            # check wether we lost a core
+            if deleted and not j.feasibility[core]:
+                j.feas_cores -= 1
+            if updated:
+                queue.update(j)
+
+def update_dag_constraints(j, start_time, queue):
+    end_time = start_time + j.cost
+    for p in j.predecessors:
+        if p.in_queue:
+            p.succ_count -= 1
+            for c in p.feasibility:
+                updated = ([a, min(b, start_time - p.cost)] for a, b in p.feasibility[c])
+                p.feasibility[c] = [[a, b] for a, b in updated if a <= b]
+            p.feas_cores = sum((1 for c in p.feasibility if p.feasibility[c]))
+            p.feas_region = sum( (sum((b - a for (a, b) in p.feasibility[c]))
+                                  for c in p.feasibility) )
+            queue.update(p)
+    for s in j.successors:
+        if s.in_queue:
+            for c in s.feasibility:
+                updated = ([max(a, end_time), b] for (a, b) in s.feasibility[c])
+                s.feasibility[c] = [[a, b] for a, b in updated if a <= b]
+            s.feas_cores = sum((1 for c in p.feasibility if s.feasibility[c]))
+            s.feas_region = sum( (sum((b - a for (a, b) in s.feasibility[c]))
+                                  for c in s.feasibility) )
+            queue.update(s)
 
 def latest_startpoint(job):
     per_core = ((c, max(job.feasibility[c], key=lambda x: x[1]))
@@ -63,31 +100,14 @@ def init_overlap(jobs):
             j2.overlapping_jobs.append(j1)
 
 def order_criterion(j):
-    fcores, tfeas = feas_score(j)
     latest_pos = latest_startpoint(j)
     return (
         j.succ_count,
-        fcores,
+        j.feas_cores,
         -latest_pos[1][1] if latest_pos else 0,
-        tfeas,
+        j.feas_region,
         -j.cost,
     )
-
-def update_dag_constraints(j, start_time, queue):
-    end_time = start_time + j.cost
-    for p in j.predecessors:
-        if p.in_queue:
-            p.succ_count -= 1
-            for c in p.feasibility:
-                updated = ((a, min(b, start_time - p.cost)) for (a, b) in p.feasibility[c])
-                p.feasibility[c] = [(a, b) for (a, b) in updated if a <= b]
-            queue.update(p)
-    for s in j.successors:
-        if s.in_queue:
-            for c in s.feasibility:
-                updated = ((max(a, end_time), b) for (a, b) in s.feasibility[c])
-                s.feasibility[c] = [(a, b) for (a, b) in updated if a <= b]
-            queue.update(s)
 
 def backfill_latest_fit(jobs, schedule):
     unassigned = set()
@@ -102,10 +122,10 @@ def backfill_latest_fit(jobs, schedule):
         if latest_pos:
             core, (_, start_time) = latest_pos
             schedule[core].append((j, start_time))
-            # reduce the feasibility windows of everyone else
-            update_feas(core, j, start_time, queue)
             # update the feasibility windows of predecessors and successors
             update_dag_constraints(j, start_time, queue)
+            # reduce the feasibility windows of everyone else
+            update_feas(core, j, start_time, queue)
         else:
             unassigned.add(j)
 
