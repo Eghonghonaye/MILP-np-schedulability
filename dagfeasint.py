@@ -65,7 +65,7 @@ def update_feas(core, scheduled_job, start_time, queue, later_jobs):
 def update_dag_constraints(j, start_time, queue, later_jobs):
     end_time = start_time + j.cost
     for p in j.predecessors:
-        if p.in_queue or j in later_jobs:
+        if p.in_queue or p in later_jobs:
             p.succ_count -= 1
             for c in p.feasibility:
                 updated = ([a, min(b, start_time - p.cost)] for a, b in p.feasibility[c])
@@ -76,7 +76,7 @@ def update_dag_constraints(j, start_time, queue, later_jobs):
             if p.in_queue:
                 queue.update(p)
     for s in j.successors:
-        if s.in_queue or j in later_jobs:
+        if s.in_queue or s in later_jobs:
             for c in s.feasibility:
                 updated = ([max(a, end_time), b] for (a, b) in s.feasibility[c])
                 s.feasibility[c] = [[a, b] for a, b in updated if a <= b]

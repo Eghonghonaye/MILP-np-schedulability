@@ -6,6 +6,7 @@ import os
 import sys
 import ast
 
+from itertools import combinations
 from collections import defaultdict
 
 import backfill
@@ -105,11 +106,11 @@ def validate(all_jobs, allocations):
         assert alloc.end <= alloc.job.deadline
         assert alloc.end - alloc.start == alloc.job.cost
         # check for overlaps
-        for other_alloc in allocations:
-            if other_alloc != alloc and other_alloc.core == alloc.core:
-                # make sure there is no overlap
-                assert alloc.start >= other_alloc.end or \
-                       other_alloc.start >= alloc.end
+    for alloc, other_alloc in combinations(allocations, 2):
+        if other_alloc.core == alloc.core:
+            # make sure there is no overlap
+            assert alloc.start >= other_alloc.end or \
+                   other_alloc.start >= alloc.end
     # make sure no job was missed
     for j in all_jobs:
         assert j in allocated
