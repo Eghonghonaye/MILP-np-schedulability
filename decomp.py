@@ -42,7 +42,6 @@ def decompose_limited_preemptive(jobs, integral=True):
         # tweak release and deadline
         j.release  += pre
         j.deadline -= rem
-        print(j.id, j.decomp_release, j.decomp_deadline, j.release, j.deadline)
 
     # now mask DAG structure
     for j in jobs:
