@@ -13,6 +13,7 @@ import backfill
 import feasint
 import dagfill
 import dagfeasint
+from decomp import decompose_limited_preemptive, decompose_restore
 
 import cProfile
 
@@ -175,12 +176,19 @@ def process(opts, fname):
 
         def run_heuristic():
             print('Trying to schedule %s (%d jobs)...' % (name, len(jobset.jobs)))
+
+            if opts.decompose and jobset.is_dag:
+                decompose_limited_preemptive(jobset.jobs)
+
             if opts.heuristic == 'backfill':
                 (unassigned, schedule, _) = dagfill.paf_meta_heuristic(jobset.jobs, ncores)
             elif opts.heuristic == 'feasint':
                 (unassigned, schedule, _) = dagfeasint.paf_meta_heuristic(jobset.jobs, ncores)
             else:
                 assert False
+
+            if opts.decompose and jobset.is_dag:
+                decompose_restore(jobset.jobs)
 
             if not unassigned:
                 return heuristic_solution(schedule)
@@ -241,6 +249,10 @@ def parse_args():
                         action='store',
                         choices=['backfill', 'feasint'],
                         help='run a scheduling heuristic')
+
+    parser.add_argument('--decompose', default=None,
+                        action='store_true',
+                        help='decompose the DAG before running heuristic')
 
     parser.add_argument('-f', '--log-failures', default=None,
                         action='store_true',
